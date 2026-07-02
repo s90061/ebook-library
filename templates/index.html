@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#121212">
+<title>E-Book Library</title>
+<link rel="stylesheet" href="/api/css/style.css">
+</head>
+<body>
+
+<!-- Header -->
+<header>
+    <h1>📚 電子書庫</h1>
+    <div class="header-controls">
+        <select id="statusFilter">
+            <option value="">全部</option>
+            <option value="Wishlist">欲讀</option>
+            <option value="Reading">閱讀中</option>
+            <option value="Completed">完讀</option>
+        </select>
+        <input type="text" id="searchInput" placeholder="搜尋書名或作者..." autocomplete="off">
+        <button class="btn" id="addBookBtn">+ 新增</button>
+    </div>
+</header>
+
+<!-- Main Content -->
+<main>
+    <div class="book-grid" id="bookGrid"></div>
+</main>
+
+<!-- Detail Drawer -->
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<div class="drawer" id="detailDrawer">
+    <div class="drawer-header">
+        <span style="font-weight:600;">書籍詳情</span>
+        <button class="close-btn" id="closeDrawer">✕</button>
+    </div>
+    <div class="drawer-body" id="drawerBody">
+        <!-- Filled by JS -->
+    </div>
+</div>
+
+<!-- Add Book Modal -->
+<div class="drawer-overlay" id="addOverlay"></div>
+<div class="drawer" id="addDrawer">
+    <div class="drawer-header">
+        <span style="font-weight:600;">新增書籍</span>
+        <button class="close-btn" id="closeAddDrawer">✕</button>
+    </div>
+    <div class="drawer-body" id="addDrawerBody">
+        <form id="addForm" onsubmit="return false;">
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">網址</label>
+                <input type="url" id="addUrl" placeholder="貼上電子書平台網址" style="width:100%;margin-top:4px;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:14px;outline:none;">
+            </div>
+            <div class="detail-meta" style="grid-template-columns:1fr;">
+                <div class="meta-item">
+                    <div class="label">書名 *</div>
+                    <input type="text" id="addTitle" required placeholder="書名" style="width:100%;background:transparent;border:none;color:var(--text-primary);font-size:14px;outline:none;">
+                </div>
+                <div class="meta-item">
+                    <div class="label">副標題</div>
+                    <input type="text" id="addSubtitle" placeholder="副標題" style="width:100%;background:transparent;border:none;color:var(--text-primary);font-size:14px;outline:none;">
+                </div>
+                <div class="meta-item">
+                    <div class="label">作者</div>
+                    <input type="text" id="addAuthor" placeholder="作者" style="width:100%;background:transparent;border:none;color:var(--text-primary);font-size:14px;outline:none;">
+                </div>
+                <div class="meta-item">
+                    <div class="label">出版社</div>
+                    <input type="text" id="addPublisher" placeholder="出版社" style="width:100%;background:transparent;border:none;color:var(--text-primary);font-size:14px;outline:none;">
+                </div>
+                <div class="meta-item">
+                    <div class="label">ISBN</div>
+                    <input type="text" id="addIsbn" placeholder="ISBN" style="width:100%;background:transparent;border:none;color:var(--text-primary);font-size:14px;outline:none;">
+                </div>
+                <div class="meta-item">
+                    <div class="label">封面網址</div>
+                    <input type="url" id="addCover" placeholder="封面圖片網址" style="width:100%;background:transparent;border:none;color:var(--text-primary);font-size:14px;outline:none;">
+                </div>
+                <div class="meta-item">
+                    <div class="label">標籤 (以逗號分隔)</div>
+                    <input type="text" id="addTags" placeholder="靈性, 健身, 心理學" style="width:100%;background:transparent;border:none;color:var(--text-primary);font-size:14px;outline:none;">
+                </div>
+            </div>
+
+            <div class="detail-section-title">平台連結</div>
+            <div id="platformInputs">
+                <div class="platform-item" style="padding:0;background:transparent;border:none;margin-bottom:8px;gap:6px;flex-wrap:wrap;">
+                    <select id="platName0" style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);padding:8px;font-size:13px;flex:1;min-width:100px;">
+                        <option value="">選擇平台</option>
+                        <option value="Readmoo">Readmoo</option>
+                        <option value="HyRead">HyRead</option>
+                        <option value="Kobo">Kobo</option>
+                        <option value="Google">Google Play</option>
+                        <option value="其他">其他</option>
+                    </select>
+                    <input type="url" id="platUrl0" placeholder="書籍網址" style="flex:2;min-width:150px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);padding:8px;font-size:13px;outline:none;">
+                    <button type="button" class="btn-outline" style="padding:6px 12px;font-size:12px;" onclick="addPlatformRow()">+</button>
+                </div>
+            </div>
+
+            <button type="submit" class="btn" style="width:100%;padding:12px;font-size:15px;margin-top:8px;" onclick="submitNewBook()">儲存</button>
+        </form>
+    </div>
+</div>
+
+<script src="/api/js/app.js"></script>
+</body>
+</html>

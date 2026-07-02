@@ -1,0 +1,21 @@
+# 書庫資料（使用者個人資料，不進版控）
+library.db
+library.json
+*.db-journal
+*.db-wal
+*.db-shm
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+rendered_dump.html
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+test_api.py
+test_parse.py
+test_storage.py
