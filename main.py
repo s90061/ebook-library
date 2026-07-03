@@ -13,6 +13,8 @@ import sqlite3
 import os
 from datetime import datetime
 
+import scraper
+
 app = FastAPI(title="E-Book Library")
 
 # Paths
@@ -48,6 +50,9 @@ class BookCreate(BaseModel):
     rating: int = 0
     note: Optional[str] = None
     platforms: Optional[List[PlatformLink]] = None
+
+class ScrapeRequest(BaseModel):
+    url: str
 
 class BookUpdate(BaseModel):
     title: Optional[str] = None
@@ -87,6 +92,24 @@ async def css():
 async def js():
     js_path = pathlib.Path(STATIC_DIR) / "js" / "app.js"
     return HTMLResponse(content=js_path.read_text(encoding="utf-8"), media_type="application/javascript")
+
+@app.post("/api/scrape")
+async def scrape_url(payload: ScrapeRequest):
+    """依網址抓取書本資訊,供新增書籍表單「貼上網址自動填入」使用。"""
+    try:
+        info = scraper.scrape(payload.url)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"抓取失敗：{e}")
+
+    return {
+        "title": info.get("title", ""),
+        "author": info.get("author", ""),
+        "publisher": info.get("publisher", ""),
+        "isbn": info.get("isbn", ""),
+        "cover_url": info.get("cover", ""),
+        "platform_name": info.get("platform_name", ""),
+        "url": info.get("url", payload.url),
+    }
 
 @app.get("/api/books")
 async def get_books(status: Optional[str] = None, search: Optional[str] = None):

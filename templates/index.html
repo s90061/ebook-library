@@ -52,7 +52,11 @@
         <form id="addForm" onsubmit="return false;">
             <div style="margin-bottom:12px;">
                 <label style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">網址</label>
-                <input type="url" id="addUrl" placeholder="貼上電子書平台網址" style="width:100%;margin-top:4px;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:14px;outline:none;">
+                <div style="display:flex;gap:6px;margin-top:4px;">
+                    <input type="url" id="addUrl" placeholder="貼上電子書平台網址（Readmoo／Kobo／HyRead／博客來）" style="flex:1;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:14px;outline:none;">
+                    <button type="button" class="btn-outline" style="padding:0 14px;font-size:13px;white-space:nowrap;" onclick="fetchFromUrl()">抓取</button>
+                </div>
+                <div id="fetchStatus" style="font-size:12px;color:var(--text-muted);margin-top:4px;"></div>
             </div>
             <div class="detail-meta" style="grid-template-columns:1fr;">
                 <div class="meta-item">
@@ -93,6 +97,7 @@
                         <option value="Readmoo">Readmoo</option>
                         <option value="HyRead">HyRead</option>
                         <option value="Kobo">Kobo</option>
+                        <option value="博客來">博客來</option>
                         <option value="Google">Google Play</option>
                         <option value="其他">其他</option>
                     </select>

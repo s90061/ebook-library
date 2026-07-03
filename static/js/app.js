@@ -38,6 +38,16 @@ const API = {
             body: JSON.stringify(platform)
         });
         return res.json();
+    },
+    async scrapeUrl(url) {
+        const res = await fetch('/api/scrape', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || '抓取失敗');
+        return data;
     }
 };
 
@@ -50,7 +60,7 @@ let platformRowCount = 1;
 function getPlatformChipHTML(platforms) {
     return platforms.map(p => {
         const name = p.platform_name || '其他';
-        const cls = ['Readmoo','HyRead','Kobo','Google'].includes(name) ? name : 'default';
+        const cls = ['Readmoo','HyRead','Kobo','博客來','Google'].includes(name) ? name : 'default';
         return `<span class="platform-chip ${cls}">${name}</span>`;
     }).join('');
 }
@@ -238,6 +248,7 @@ function closeAddDrawer() {
                 <option value="Readmoo">Readmoo</option>
                 <option value="HyRead">HyRead</option>
                 <option value="Kobo">Kobo</option>
+                <option value="博客來">博客來</option>
                 <option value="Google">Google Play</option>
                 <option value="其他">其他</option>
             </select>
@@ -266,6 +277,43 @@ function addPlatformRow() {
         <button type="button" style="background:none;border:none;color:#e57373;font-size:18px;cursor:pointer;padding:4px 8px;" onclick="this.parentElement.remove()">✕</button>
     `;
     container.appendChild(row);
+}
+
+async function fetchFromUrl() {
+    const url = document.getElementById('addUrl').value.trim();
+    const statusEl = document.getElementById('fetchStatus');
+    if (!url) { statusEl.textContent = '請先貼上網址。'; return; }
+
+    statusEl.textContent = '抓取中...';
+    try {
+        const info = await API.scrapeUrl(url);
+        document.getElementById('addTitle').value = info.title || '';
+        document.getElementById('addAuthor').value = info.author || '';
+        document.getElementById('addPublisher').value = info.publisher || '';
+        document.getElementById('addIsbn').value = info.isbn || '';
+        document.getElementById('addCover').value = info.cover_url || '';
+
+        // 填入偵測到的平台連結：優先用第一個空白列，否則新增一列
+        const container = document.getElementById('platformInputs');
+        let selects = container.querySelectorAll('select');
+        let urls = container.querySelectorAll('input[type="url"]');
+        let targetIndex = -1;
+        for (let i = 0; i < selects.length; i++) {
+            if (!selects[i].value && !urls[i].value) { targetIndex = i; break; }
+        }
+        if (targetIndex === -1) {
+            addPlatformRow();
+            selects = container.querySelectorAll('select');
+            urls = container.querySelectorAll('input[type="url"]');
+            targetIndex = selects.length - 1;
+        }
+        selects[targetIndex].value = info.platform_name || '其他';
+        urls[targetIndex].value = info.url || url;
+
+        statusEl.textContent = '已自動填入，請確認資訊是否正確。';
+    } catch (e) {
+        statusEl.textContent = '抓取失敗：' + e.message;
+    }
 }
 
 async function submitNewBook() {

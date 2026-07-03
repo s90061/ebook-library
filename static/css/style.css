@@ -211,6 +211,7 @@ main {
 .platform-chip.Readmoo { background: rgba(255,107,53,0.15); color: #ff6b35; border: 1px solid rgba(255,107,53,0.3); }
 .platform-chip.HyRead { background: rgba(41,128,185,0.15); color: #2980b9; border: 1px solid rgba(41,128,185,0.3); }
 .platform-chip.Kobo { background: rgba(87,184,70,0.15); color: #57b846; border: 1px solid rgba(87,184,70,0.3); }
+.platform-chip.博客來 { background: rgba(192,57,43,0.15); color: #c0392b; border: 1px solid rgba(192,57,43,0.3); }
 .platform-chip.Google { background: rgba(66,133,244,0.15); color: #4285f4; border: 1px solid rgba(66,133,244,0.3); }
 .platform-chip.default { background: rgba(255,255,255,0.08); color: var(--text-secondary); border: 1px solid var(--border-light); }
 

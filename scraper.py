@@ -6,6 +6,7 @@ scraper.py — 從電子書平台網址抓取書本資訊
   - Readmoo 讀墨   (readmoo.com)
   - Kobo           (kobo.com)
   - HyRead         (ebook.hyread.com.tw)
+  - 博客來         (books.com.tw)
 
 策略(依序):
   1. 靜態抓取(requests):解析 JSON-LD + Open Graph meta,再依平台客製化補強。
@@ -75,13 +76,16 @@ def detect_platform(url):
         return "kobo"
     if "hyread.com.tw" in host:
         return "hyread"
+    if "books.com.tw" in host:
+        return "books"
     return "unknown"
 
 
 PLATFORM_NAMES = {
-    "readmoo": "Readmoo 讀墨",
+    "readmoo": "Readmoo",
     "kobo": "Kobo",
     "hyread": "HyRead",
+    "books": "博客來",
     "unknown": "其他",
 }
 
@@ -277,10 +281,61 @@ def _parse_hyread(soup):
     return info
 
 
+def _label_value(page_text, label):
+    """從純文字中抓「標籤：值」格式的內容(遇到下一個已知標籤或多重空白就停止)。"""
+    m = re.search(
+        label + r"[：:]\s*([^\s].*?)(?=\s{2,}|$|作者[：:]|出版社[：:]|出版日期[：:]|ISBN[：:]|語言[：:])",
+        page_text,
+    )
+    return _clean(m.group(1)) if m else ""
+
+
+def _parse_books(soup):
+    """博客來:主要靠 JSON-LD(Book/Product)取得書名、作者、出版社、ISBN、封面,
+    OG meta 為輔;頁面上「作者：/出版社：/ISBN：」文字標籤作最後備援。
+    """
+    info = {}
+    for item in _parse_jsonld(soup):
+        t = item.get("@type", "")
+        types = t if isinstance(t, list) else [t]
+        if any(x in ("Book", "Product") for x in types):
+            info["title"] = info.get("title") or _clean(item.get("name"))
+            info["author"] = info.get("author") or _extract_author_from_jsonld(item)
+            img = item.get("image")
+            if isinstance(img, list):
+                img = img[0] if img else ""
+            if isinstance(img, dict):
+                img = img.get("url", "")
+            info["cover"] = info.get("cover") or _clean(img)
+            pub = item.get("publisher")
+            if isinstance(pub, dict):
+                pub = pub.get("name", "")
+            info["publisher"] = info.get("publisher") or _clean(pub)
+            info["isbn"] = info.get("isbn") or _clean(item.get("isbn"))
+
+    title = _meta(soup, "og:title")
+    title = re.sub(r"\s*[-|｜]\s*博客來.*$", "", title).strip()
+    info["title"] = info.get("title") or title
+    info["cover"] = info.get("cover") or _meta(soup, "og:image")
+    info["description"] = _meta(soup, "og:description") or _meta(soup, "description")
+
+    page_text = _clean(soup.get_text(" "))
+    if not info.get("author"):
+        info["author"] = _label_value(page_text, "作者") or _meta(soup, "author") or _meta(soup, "book:author")
+    if not info.get("publisher"):
+        info["publisher"] = _label_value(page_text, "出版社")
+    if not info.get("isbn"):
+        m = re.search(r"ISBN(?:13)?[：:]?\s*([\dXx\-]{10,17})", page_text)
+        info["isbn"] = m.group(1).replace("-", "") if m else ""
+
+    return info
+
+
 PARSERS = {
     "readmoo": _parse_readmoo,
     "kobo": _parse_kobo,
     "hyread": _parse_hyread,
+    "books": _parse_books,
 }
 
 

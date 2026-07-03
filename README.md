@@ -2,7 +2,7 @@
 
 一個跑在自己電腦（或 Raspberry Pi）上的本地端電子書收藏庫。**貼上書本網址就自動抓取封面、書名、作者等資訊**並加入書庫；以卡片方式呈現，點擊卡片可看完整書籍資料與平台連結。
 
-支援平台：**Readmoo 讀墨**、**Kobo**、**HyRead**。
+支援平台：**Readmoo 讀墨**、**Kobo**、**HyRead**、**博客來**。
 
 ---
 
@@ -46,7 +46,8 @@ sudo apt install -y python3-venv xvfb
 2. 貼上書本頁面網址，例如：
    - `https://readmoo.com/book/210481242000101`
    - `https://ebook.hyread.com.tw/bookDetail.jsp?id=504740`
-3. 自動填入書名、作者、出版社、ISBN 等資訊
+   - `https://www.books.com.tw/products/E050335371`
+3. 點擊「抓取」，自動填入書名、作者、出版社、ISBN 等資訊
 4. 點擊「儲存」即加入書庫
 
 ---
@@ -77,6 +78,7 @@ sudo apt install -y python3-venv xvfb
 
 | 方法 | 路徑 | 說明 |
 | --- | --- | --- |
+| `POST` | `/api/scrape` | 依網址抓取書本資訊（body: `{"url": "..."}`），供新增表單自動填入 |
 | `GET` | `/api/books` | 取得所有書本（支援 `?status=` 與 `?search=` 過濾） |
 | `GET` | `/api/books/<id>` | 取得單一書本詳細資訊（含平台連結） |
 | `POST` | `/api/books` | 新增書本 |
