@@ -2,7 +2,8 @@
 import sqlite3
 import os
 
-db_path = "/home/s90061/.hermes/ebook-library/library.db"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+db_path = os.path.join(BASE_DIR, "library.db")
 with sqlite3.connect(db_path) as conn:
     conn.executescript('''
 CREATE TABLE IF NOT EXISTS books (

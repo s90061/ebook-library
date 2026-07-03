@@ -93,50 +93,45 @@ async def get_books(status: Optional[str] = None, search: Optional[str] = None):
     """Get all books with optional filtering"""
     conn = get_db()
     cursor = conn.cursor()
-    
-    query = """
-        SELECT b.*, 
-               GROUP_CONCAT(p.platform_name || '|' || p.url || '|' || 
-                           COALESCE(p.price, '') || '|' || COALESCE(p.format, '')) as platforms
-        FROM books b
-        LEFT JOIN platform_links p ON b.id = p.book_id
-    """
+
+    query = "SELECT * FROM books"
     conditions = []
     params = []
-    
+
     if status:
-        conditions.append("b.status = ?")
+        conditions.append("status = ?")
         params.append(status)
     if search:
-        conditions.append("(b.title LIKE ? OR b.author LIKE ?)")
+        conditions.append("(title LIKE ? OR author LIKE ?)")
         params.extend([f"%{search}%", f"%{search}%"])
-    
+
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
-    
-    query += " GROUP BY b.id ORDER BY b.date_added DESC"
-    
+
+    query += " ORDER BY date_added DESC"
+
     cursor.execute(query, params)
-    rows = cursor.fetchall()
+    book_rows = cursor.fetchall()
+
+    book_ids = [row["id"] for row in book_rows]
+    platforms_by_book = {book_id: [] for book_id in book_ids}
+    if book_ids:
+        placeholders = ",".join("?" * len(book_ids))
+        cursor.execute(
+            f"SELECT * FROM platform_links WHERE book_id IN ({placeholders})",
+            book_ids,
+        )
+        for p_row in cursor.fetchall():
+            platforms_by_book[p_row["book_id"]].append(dict_from_row(p_row))
+
     conn.close()
-    
+
     books = []
-    for row in rows:
+    for row in book_rows:
         book = dict_from_row(row)
-        # Parse platforms
-        book['platforms'] = []
-        if row['platforms']:
-            for p_str in row['platforms'].split(','):
-                parts = p_str.split('|')
-                if len(parts) >= 2:
-                    book['platforms'].append({
-                        'platform_name': parts[0],
-                        'url': parts[1],
-                        'price': float(parts[2]) if parts[2] else None,
-                        'format': parts[3] if len(parts) > 3 else None
-                    })
+        book["platforms"] = platforms_by_book[row["id"]]
         books.append(book)
-    
+
     return {"books": books, "count": len(books)}
 
 @app.get("/api/books/{book_id}")
