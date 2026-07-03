@@ -17,12 +17,13 @@ import threading
 import uuid
 from datetime import datetime
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_from_directory
 
 import scraper
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, "library.json")
+STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 app = Flask(__name__)
 _lock = threading.Lock()  # 避免多請求同時寫檔造成資料毀損
@@ -54,6 +55,18 @@ def save_books(books):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/api/css/style.css")
+def css():
+    """共用前端樣板 (templates/index.html) 走 /api/css/... 路徑取資源,
+    這裡對齊 main.py (FastAPI) 的路由,讓 v1/v2 都能正常載入樣式與腳本。"""
+    return send_from_directory(os.path.join(STATIC_DIR, "css"), "style.css", mimetype="text/css")
+
+
+@app.route("/api/js/app.js")
+def js():
+    return send_from_directory(os.path.join(STATIC_DIR, "js"), "app.js", mimetype="application/javascript")
 
 
 @app.route("/api/books", methods=["GET"])
