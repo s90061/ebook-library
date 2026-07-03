@@ -6,7 +6,6 @@ scraper.py — 從電子書平台網址抓取書本資訊
   - Readmoo 讀墨   (readmoo.com)
   - Kobo           (kobo.com)
   - HyRead         (ebook.hyread.com.tw)
-  - 博客來         (books.com.tw)
 
 策略(依序):
   1. 靜態抓取(requests):解析 JSON-LD + Open Graph meta,再依平台客製化補強。
@@ -76,16 +75,13 @@ def detect_platform(url):
         return "kobo"
     if "hyread.com.tw" in host:
         return "hyread"
-    if "books.com.tw" in host:
-        return "books"
     return "unknown"
 
 
 PLATFORM_NAMES = {
-    "readmoo": "Readmoo",
+    "readmoo": "Readmoo 讀墨",
     "kobo": "Kobo",
     "hyread": "HyRead",
-    "books": "博客來",
     "unknown": "其他",
 }
 
@@ -281,61 +277,10 @@ def _parse_hyread(soup):
     return info
 
 
-def _label_value(page_text, label):
-    """從純文字中抓「標籤：值」格式的內容(遇到下一個已知標籤或多重空白就停止)。"""
-    m = re.search(
-        label + r"[：:]\s*([^\s].*?)(?=\s{2,}|$|作者[：:]|出版社[：:]|出版日期[：:]|ISBN[：:]|語言[：:])",
-        page_text,
-    )
-    return _clean(m.group(1)) if m else ""
-
-
-def _parse_books(soup):
-    """博客來:主要靠 JSON-LD(Book/Product)取得書名、作者、出版社、ISBN、封面,
-    OG meta 為輔;頁面上「作者：/出版社：/ISBN：」文字標籤作最後備援。
-    """
-    info = {}
-    for item in _parse_jsonld(soup):
-        t = item.get("@type", "")
-        types = t if isinstance(t, list) else [t]
-        if any(x in ("Book", "Product") for x in types):
-            info["title"] = info.get("title") or _clean(item.get("name"))
-            info["author"] = info.get("author") or _extract_author_from_jsonld(item)
-            img = item.get("image")
-            if isinstance(img, list):
-                img = img[0] if img else ""
-            if isinstance(img, dict):
-                img = img.get("url", "")
-            info["cover"] = info.get("cover") or _clean(img)
-            pub = item.get("publisher")
-            if isinstance(pub, dict):
-                pub = pub.get("name", "")
-            info["publisher"] = info.get("publisher") or _clean(pub)
-            info["isbn"] = info.get("isbn") or _clean(item.get("isbn"))
-
-    title = _meta(soup, "og:title")
-    title = re.sub(r"\s*[-|｜]\s*博客來.*$", "", title).strip()
-    info["title"] = info.get("title") or title
-    info["cover"] = info.get("cover") or _meta(soup, "og:image")
-    info["description"] = _meta(soup, "og:description") or _meta(soup, "description")
-
-    page_text = _clean(soup.get_text(" "))
-    if not info.get("author"):
-        info["author"] = _label_value(page_text, "作者") or _meta(soup, "author") or _meta(soup, "book:author")
-    if not info.get("publisher"):
-        info["publisher"] = _label_value(page_text, "出版社")
-    if not info.get("isbn"):
-        m = re.search(r"ISBN(?:13)?[：:]?\s*([\dXx\-]{10,17})", page_text)
-        info["isbn"] = m.group(1).replace("-", "") if m else ""
-
-    return info
-
-
 PARSERS = {
     "readmoo": _parse_readmoo,
     "kobo": _parse_kobo,
     "hyread": _parse_hyread,
-    "books": _parse_books,
 }
 
 
@@ -492,11 +437,15 @@ def _fetch_rendered(url):
             finally:
                 browser.close()
 
-    # 乾淨的有頭 chromium(已實測可通過);失敗再退回系統 Chrome(有頭)
+    # 改為有頭模式 — 系統有 DISPLAY（Xorg / xrdp），但在背景進程需手動設定
+    import os
+    if "DISPLAY" not in os.environ:
+        os.environ["DISPLAY"] = ":10"
     try:
         return _run(headless=False)
     except Exception:
-        return _run(headless=False, channel="chrome")
+        # 不要 fallback 到 channel="chrome" — 我們用的是 Playwright 的 Chromium，不是系統 Chrome
+        raise
 
 
 def scrape(url):
@@ -505,16 +454,22 @@ def scrape(url):
     platform = detect_platform(url)
     parser = PARSERS.get(platform, _parse_generic)
 
-    # 取得 HTML:先試輕量靜態抓取,失敗或內容被擋(空白)再用瀏覽器渲染
-    html = None
+    # 取得書本資訊:先試輕量靜態抓取,「實際解析到書名」才採用;
+    # 否則(靜態被擋、需 JavaScript、或內容不足)退回瀏覽器渲染。
+    def _try_parse(html):
+        if not html:
+            return None
+        cand = parser(BeautifulSoup(html, "lxml"))
+        return cand if cand.get("title") else None
+
+    info = None
     if STATIC_FIRST:
         try:
-            h = _fetch_static(url)
-            if h and not _looks_empty(h):
-                html = h
+            info = _try_parse(_fetch_static(url))
         except Exception:
-            pass  # 靜態被擋(403/400)→ 改用瀏覽器
-    if html is None:
+            info = None  # 靜態被擋(403/400)等 → 改用瀏覽器
+
+    if info is None:
         try:
             html = _render(url)
         except RuntimeError as e:
@@ -523,9 +478,7 @@ def scrape(url):
                 "pip install playwright 並執行 playwright install chromium "
                 "(或 pip install nodriver / cloakbrowser)。(%s)" % e
             ) from None
-
-    soup = BeautifulSoup(html, "lxml")
-    info = parser(soup)
+        info = parser(BeautifulSoup(html, "lxml"))
 
     info.setdefault("title", "")
     info.setdefault("author", "")

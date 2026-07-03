@@ -1,11 +1,7 @@
 Flask>=3.0
-fastapi>=0.110
-uvicorn>=0.27
-jinja2>=3.1
 requests>=2.31
 beautifulsoup4>=4.12
 lxml>=5.0
-# 瀏覽器後端（選裝，依需求）
-# playwright>=1.40
-# cloakbrowser
-# nodriver
+# 本專案在會阻擋程式化請求的網路環境下,必須用 Playwright 有頭瀏覽器抓取
+# 安裝後還需執行一次: playwright install chromium
+playwright>=1.40

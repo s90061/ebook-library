@@ -3,10 +3,11 @@
 app.py — 本地端電子書書庫 Flask 伺服器
 
 功能:
-  GET  /                 首頁(卡片式書庫介面)
-  GET  /api/books        取得所有書本
-  POST /api/books        新增書本(body: {"url": "..."}),自動抓取資訊
-  DELETE /api/books/<id> 刪除書本
+  GET    /                首頁(卡片式書庫介面)
+  GET    /api/books       取得所有書本
+  POST   /api/books       新增書本(body: {"url": "..."}),自動抓取資訊
+  PATCH  /api/books/<id>  更新書本(目前支援 status:未讀/閱讀中/完讀)
+  DELETE /api/books/<id>  刪除書本
 
 資料以 library.json 儲存於本檔同目錄。
 """
@@ -17,16 +18,19 @@ import threading
 import uuid
 from datetime import datetime
 
-from flask import Flask, jsonify, render_template, request, send_from_directory
+from flask import Flask, jsonify, render_template, request
 
 import scraper
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, "library.json")
-STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 app = Flask(__name__)
 _lock = threading.Lock()  # 避免多請求同時寫檔造成資料毀損
+
+# 允許的閱讀狀態:未讀 / 閱讀中 / 完讀
+VALID_STATUS = ("unread", "reading", "read")
+DEFAULT_STATUS = "unread"
 
 
 # ---------------------------------------------------------------------------
@@ -57,18 +61,6 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/api/css/style.css")
-def css():
-    """共用前端樣板 (templates/index.html) 走 /api/css/... 路徑取資源,
-    這裡對齊 main.py (FastAPI) 的路由,讓 v1/v2 都能正常載入樣式與腳本。"""
-    return send_from_directory(os.path.join(STATIC_DIR, "css"), "style.css", mimetype="text/css")
-
-
-@app.route("/api/js/app.js")
-def js():
-    return send_from_directory(os.path.join(STATIC_DIR, "js"), "app.js", mimetype="application/javascript")
-
-
 @app.route("/api/books", methods=["GET"])
 def get_books():
     """回傳所有書本,最新加入的排在最前面。"""
@@ -78,7 +70,7 @@ def get_books():
 
 @app.route("/api/books", methods=["POST"])
 def add_book():
-    """新增書本:接收網址 → 抓取資訊 → 存入書庫。"""
+    """新增書本:接收網址 -> 抓取資訊 -> 存入書庫。"""
     payload = request.get_json(silent=True) or {}
     url = (payload.get("url") or "").strip()
 
@@ -99,15 +91,35 @@ def add_book():
         try:
             info = scraper.scrape(url)
         except Exception as e:  # noqa: BLE001 抓取失敗一律回報給前端
-            return jsonify({"error": f"抓取失敗:{e}"}), 502
+            return jsonify({"error": "抓取失敗:%s" % e}), 502
 
         info["id"] = uuid.uuid4().hex
         info["added_at"] = datetime.now().isoformat(timespec="seconds")
+        info["status"] = DEFAULT_STATUS  # 新書預設「未讀」
 
         books.append(info)
         save_books(books)
 
     return jsonify(info), 201
+
+
+@app.route("/api/books/<book_id>", methods=["PATCH"])
+def update_book(book_id):
+    """更新書本欄位;目前支援更新閱讀狀態 status(未讀/閱讀中/完讀)。"""
+    payload = request.get_json(silent=True) or {}
+    status = payload.get("status")
+    if status is not None and status not in VALID_STATUS:
+        return jsonify({"error": "狀態值不正確。"}), 400
+
+    with _lock:
+        books = load_books()
+        target = next((b for b in books if b.get("id") == book_id), None)
+        if target is None:
+            return jsonify({"error": "找不到這本書。"}), 404
+        if status is not None:
+            target["status"] = status
+        save_books(books)
+    return jsonify(target)
 
 
 @app.route("/api/books/<book_id>", methods=["DELETE"])
@@ -124,5 +136,5 @@ def delete_book(book_id):
 
 if __name__ == "__main__":
     # 只綁定本機,避免對外開放
-    print("電子書書庫已啟動 → 請用瀏覽器開啟 http://127.0.0.1:5000")
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    print("電子書書庫已啟動 -> 請用瀏覽器開啟 http://127.0.0.1:8086")
+    app.run(host="0.0.0.0", port=8086, debug=False)

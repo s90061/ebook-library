@@ -1,116 +1,376 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#121212">
-<title>E-Book Library</title>
-<link rel="stylesheet" href="/api/css/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>我的電子書書庫</title>
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --card-bg: #ffffff;
+      --text: #1f2933;
+      --muted: #6b7280;
+      --accent: #2563eb;
+      --readmoo: #ff6b35;
+      --kobo: #bf0000;
+      --hyread: #0aa679;
+      --st-unread: #6b7280;   /* 未讀 */
+      --st-reading: #f59e0b;  /* 閱讀中 */
+      --st-read: #16a34a;     /* 完讀 */
+      --shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: "Segoe UI", "Microsoft JhengHei", "PingFang TC", sans-serif;
+    }
+    header {
+      background: #fff; border-bottom: 1px solid #e5e7eb; padding: 18px 24px;
+      position: sticky; top: 0; z-index: 10;
+    }
+    header h1 { margin: 0 0 12px; font-size: 22px; }
+    .add-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+    .add-bar input {
+      flex: 1; min-width: 240px; padding: 10px 12px; font-size: 14px;
+      border: 1px solid #d1d5db; border-radius: 8px;
+    }
+    .add-bar button {
+      padding: 10px 20px; font-size: 14px; font-weight: 600; color: #fff;
+      background: var(--accent); border: none; border-radius: 8px; cursor: pointer;
+      white-space: nowrap;
+    }
+    .add-bar button:disabled { opacity: .6; cursor: not-allowed; }
+    .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+    #msg { margin-top: 10px; font-size: 14px; display: none; padding: 8px 12px; border-radius: 6px; }
+    #msg.err { display: block; background: #fee2e2; color: #b91c1c; }
+    #msg.ok  { display: block; background: #dcfce7; color: #15803d; }
+
+    /* 篩選列 */
+    .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .filters button {
+      padding: 6px 14px; font-size: 13px; border: 1px solid #d1d5db; background: #fff;
+      border-radius: 999px; cursor: pointer; color: var(--text);
+    }
+    .filters button.active { background: var(--text); color: #fff; border-color: var(--text); }
+    .filters .count { opacity: .7; margin-left: 4px; font-size: 12px; }
+
+    main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+    .stats { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+    .grid {
+      display: grid; gap: 20px;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    }
+    .card {
+      background: var(--card-bg); border-radius: 12px; overflow: hidden;
+      box-shadow: var(--shadow); cursor: pointer; transition: transform .15s, box-shadow .15s;
+      display: flex; flex-direction: column; position: relative;
+    }
+    .card:hover { transform: translateY(-4px); box-shadow: 0 8px 20px rgba(0,0,0,.14); }
+    .cover-wrap {
+      aspect-ratio: 3/4; background: #e5e7eb; overflow: hidden; position: relative;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cover-wrap img { width: 100%; height: 100%; object-fit: cover; }
+    .cover-wrap .no-cover { color: var(--muted); font-size: 13px; padding: 10px; text-align: center; }
+    /* 狀態標籤:放在卡片底部,與購買平台標籤同一列(靠右),方正外型 */
+    .status-tag {
+      font-size: 13px; font-weight: 700; line-height: 1.5; color: #fff;
+      padding: 4px 12px; border-radius: 5px;
+    }
+    .status-tag.unread  { background: var(--st-unread); }
+    .status-tag.reading { background: var(--st-reading); }
+    .status-tag.read    { background: var(--st-read); }
+
+    .card-body { padding: 10px 12px 14px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+    .card-title {
+      font-size: 14px; font-weight: 600; line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .card-author { font-size: 12px; color: var(--muted);
+      display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+    .badge {
+      font-size: 11px; font-weight: 600;
+      color: #fff; padding: 2px 8px; border-radius: 999px; background: var(--muted);
+    }
+    /* 卡片底部列:購買平台(左)+ 閱讀狀態(右) */
+    .card-footer {
+      margin-top: auto; display: flex; align-items: center;
+      justify-content: space-between; gap: 6px;
+    }
+    .badge.readmoo { background: var(--readmoo); }
+    .badge.kobo    { background: var(--kobo); }
+    .badge.hyread  { background: var(--hyread); }
+
+    .empty { text-align: center; color: var(--muted); padding: 60px 20px; }
+
+    /* Modal */
+    .overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5);
+      align-items: center; justify-content: center; z-index: 50; padding: 20px;
+    }
+    .overlay.show { display: flex; }
+    .modal {
+      background: #fff; border-radius: 14px; max-width: 640px; width: 100%;
+      max-height: 90vh; overflow-y: auto; padding: 24px;
+    }
+    .modal-top { display: flex; gap: 20px; }
+    .modal-top img { width: 150px; border-radius: 8px; box-shadow: var(--shadow); flex-shrink: 0; }
+    .modal-top .no-cover-lg { width:150px; height:200px; background:#e5e7eb; border-radius:8px;
+      display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:13px;}
+    .modal h2 { margin: 0 0 10px; font-size: 20px; line-height: 1.4; }
+    .field { margin: 6px 0; font-size: 14px; }
+    .field .label { color: var(--muted); margin-right: 6px; }
+    /* 狀態切換按鈕 */
+    .status-switch { margin: 14px 0 4px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .status-switch .label { color: var(--muted); font-size: 14px; margin-right: 2px; }
+    .status-switch button {
+      font-size: 13px; padding: 6px 14px; border-radius: 999px; cursor: pointer;
+      border: 1px solid #d1d5db; background: #fff; color: var(--text);
+    }
+    .status-switch button.active.unread  { background: var(--st-unread); color:#fff; border-color: var(--st-unread); }
+    .status-switch button.active.reading { background: var(--st-reading); color:#fff; border-color: var(--st-reading); }
+    .status-switch button.active.read    { background: var(--st-read); color:#fff; border-color: var(--st-read); }
+    .modal .desc { margin-top: 18px; font-size: 14px; line-height: 1.7; white-space: pre-wrap;
+      color: #374151; border-top: 1px solid #eee; padding-top: 14px; }
+    .modal-actions { margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end; }
+    .modal-actions a, .modal-actions button {
+      font-size: 14px; padding: 9px 16px; border-radius: 8px; cursor: pointer; border: none; text-decoration: none;
+    }
+    .btn-open { background: var(--accent); color: #fff; }
+    .btn-del  { background: #fee2e2; color: #b91c1c; }
+    .btn-close{ background: #e5e7eb; color: #374151; }
+  </style>
 </head>
 <body>
-
-<!-- Header -->
-<header>
-    <h1>📚 電子書庫</h1>
-    <div class="header-controls">
-        <select id="statusFilter">
-            <option value="">全部</option>
-            <option value="Wishlist">欲讀</option>
-            <option value="Reading">閱讀中</option>
-            <option value="Completed">完讀</option>
-        </select>
-        <input type="text" id="searchInput" placeholder="搜尋書名或作者..." autocomplete="off">
-        <button class="btn" id="addBookBtn">+ 新增</button>
+  <header>
+    <h1>📚 我的電子書書庫</h1>
+    <div class="add-bar">
+      <input id="urlInput" type="url" placeholder="貼上書本網址(Readmoo / Kobo / HyRead)後按新增" />
+      <button id="addBtn" onclick="addBook()">新增書本</button>
     </div>
-</header>
+    <div class="hint">支援平台:Readmoo 讀墨、Kobo、HyRead。貼上書本頁面網址即可自動抓取封面、書名、作者。</div>
+    <div class="filters" id="filters"></div>
+    <div id="msg"></div>
+  </header>
 
-<!-- Main Content -->
-<main>
-    <div class="book-grid" id="bookGrid"></div>
-</main>
+  <main>
+    <div class="stats" id="stats"></div>
+    <div class="grid" id="grid"></div>
+    <div class="empty" id="empty" style="display:none;">書庫還是空的,貼上一個書本網址開始收藏吧!</div>
+  </main>
 
-<!-- Detail Drawer -->
-<div class="drawer-overlay" id="drawerOverlay"></div>
-<div class="drawer" id="detailDrawer">
-    <div class="drawer-header">
-        <span style="font-weight:600;">書籍詳情</span>
-        <button class="close-btn" id="closeDrawer">✕</button>
-    </div>
-    <div class="drawer-body" id="drawerBody">
-        <!-- Filled by JS -->
-    </div>
-</div>
+  <div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal" id="modal"></div>
+  </div>
 
-<!-- Add Book Modal -->
-<div class="drawer-overlay" id="addOverlay"></div>
-<div class="drawer" id="addDrawer">
-    <div class="drawer-header">
-        <span style="font-weight:600;">新增書籍</span>
-        <button class="close-btn" id="closeAddDrawer">✕</button>
-    </div>
-    <div class="drawer-body" id="addDrawerBody">
-        <form id="addForm" onsubmit="return false;">
-            <div style="margin-bottom:12px;">
-                <label style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">網址</label>
-                <div style="display:flex;gap:6px;margin-top:4px;">
-                    <input type="url" id="addUrl" placeholder="貼上電子書平台網址（Readmoo／Kobo／HyRead／博客來）" style="flex:1;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:14px;outline:none;">
-                    <button type="button" class="btn-outline" style="padding:0 14px;font-size:13px;white-space:nowrap;" onclick="fetchFromUrl()">抓取</button>
-                </div>
-                <div id="fetchStatus" style="font-size:12px;color:var(--text-muted);margin-top:4px;"></div>
+  <script>
+    let BOOKS = [];
+    let FILTER = "all";  // all / unread / reading / read
+
+    // 狀態定義
+    const STATUS = {
+      unread:  { label: "未讀",   cls: "unread" },
+      reading: { label: "閱讀中", cls: "reading" },
+      read:    { label: "完讀",   cls: "read" },
+    };
+    const STATUS_ORDER = ["unread", "reading", "read"];
+
+    // 卡片標籤用的平台英文短名(依 platform 代碼)
+    const PLATFORM_SHORT = { readmoo: "Readmoo", kobo: "Kobo", hyread: "HyRead" };
+    function platformLabel(b) {
+      return PLATFORM_SHORT[b.platform] || b.platform_name || "";
+    }
+
+    function statusOf(b) {
+      return STATUS[b.status] ? b.status : "unread";  // 舊資料無狀態時視為未讀
+    }
+
+    async function loadBooks() {
+      const res = await fetch("/api/books");
+      BOOKS = await res.json();
+      render();
+    }
+
+    function badgeClass(p) {
+      return ["readmoo", "kobo", "hyread"].includes(p) ? p : "";
+    }
+    function esc(s) {
+      return (s || "").replace(/[&<>"]/g, c =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    }
+
+    // 篩選列(含各狀態數量)
+    function renderFilters() {
+      const counts = { all: BOOKS.length, unread: 0, reading: 0, read: 0 };
+      BOOKS.forEach(b => counts[statusOf(b)]++);
+      const items = [
+        ["all", "全部"],
+        ["unread", STATUS.unread.label],
+        ["reading", STATUS.reading.label],
+        ["read", STATUS.read.label],
+      ];
+      document.getElementById("filters").innerHTML = items.map(([key, label]) =>
+        `<button class="${FILTER === key ? "active" : ""}" onclick="setFilter('${key}')">
+           ${label}<span class="count">${counts[key]}</span>
+         </button>`).join("");
+    }
+
+    function setFilter(key) {
+      FILTER = key;
+      render();
+    }
+
+    function render() {
+      renderFilters();
+      const grid = document.getElementById("grid");
+      const empty = document.getElementById("empty");
+      const stats = document.getElementById("stats");
+
+      const list = BOOKS.filter(b => FILTER === "all" || statusOf(b) === FILTER);
+
+      stats.textContent = `共 ${BOOKS.length} 本書` +
+        (FILTER === "all" ? "" : `,顯示「${STATUS[FILTER].label}」${list.length} 本`);
+      empty.style.display = BOOKS.length ? "none" : "block";
+
+      grid.innerHTML = list.map(b => {
+        const i = BOOKS.indexOf(b);
+        const st = statusOf(b);
+        return `
+        <div class="card" onclick="openModal(${i})">
+          <div class="cover-wrap">
+            ${b.cover
+              ? `<img src="${esc(b.cover)}" alt="封面" loading="lazy"
+                     onerror="this.parentNode.innerHTML='<div class=&quot;no-cover&quot;>無封面</div>'">`
+              : `<div class="no-cover">無封面</div>`}
+          </div>
+          <div class="card-body">
+            <div class="card-title">${esc(b.title)}</div>
+            <div class="card-author">${esc(b.author) || "作者未知"}</div>
+            <div class="card-footer">
+              <span class="badge ${badgeClass(b.platform)}">${esc(platformLabel(b))}</span>
+              <span class="status-tag ${st}">${STATUS[st].label}</span>
             </div>
-            <div class="detail-meta" style="grid-template-columns:1fr;">
-                <div class="meta-item">
-                    <div class="label">書名 *</div>
-                    <input type="text" id="addTitle" required placeholder="書名" style="width:100%;background:transparent;border:none;color:var(--text-primary);font-size:14px;outline:none;">
-                </div>
-                <div class="meta-item">
-                    <div class="label">副標題</div>
-                    <input type="text" id="addSubtitle" placeholder="副標題" style="width:100%;background:transparent;border:none;color:var(--text-primary);font-size:14px;outline:none;">
-                </div>
-                <div class="meta-item">
-                    <div class="label">作者</div>
-                    <input type="text" id="addAuthor" placeholder="作者" style="width:100%;background:transparent;border:none;color:var(--text-primary);font-size:14px;outline:none;">
-                </div>
-                <div class="meta-item">
-                    <div class="label">出版社</div>
-                    <input type="text" id="addPublisher" placeholder="出版社" style="width:100%;background:transparent;border:none;color:var(--text-primary);font-size:14px;outline:none;">
-                </div>
-                <div class="meta-item">
-                    <div class="label">ISBN</div>
-                    <input type="text" id="addIsbn" placeholder="ISBN" style="width:100%;background:transparent;border:none;color:var(--text-primary);font-size:14px;outline:none;">
-                </div>
-                <div class="meta-item">
-                    <div class="label">封面網址</div>
-                    <input type="url" id="addCover" placeholder="封面圖片網址" style="width:100%;background:transparent;border:none;color:var(--text-primary);font-size:14px;outline:none;">
-                </div>
-                <div class="meta-item">
-                    <div class="label">標籤 (以逗號分隔)</div>
-                    <input type="text" id="addTags" placeholder="靈性, 健身, 心理學" style="width:100%;background:transparent;border:none;color:var(--text-primary);font-size:14px;outline:none;">
-                </div>
-            </div>
+          </div>
+        </div>`;
+      }).join("");
+    }
 
-            <div class="detail-section-title">平台連結</div>
-            <div id="platformInputs">
-                <div class="platform-item" style="padding:0;background:transparent;border:none;margin-bottom:8px;gap:6px;flex-wrap:wrap;">
-                    <select id="platName0" style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);padding:8px;font-size:13px;flex:1;min-width:100px;">
-                        <option value="">選擇平台</option>
-                        <option value="Readmoo">Readmoo</option>
-                        <option value="HyRead">HyRead</option>
-                        <option value="Kobo">Kobo</option>
-                        <option value="博客來">博客來</option>
-                        <option value="Google">Google Play</option>
-                        <option value="其他">其他</option>
-                    </select>
-                    <input type="url" id="platUrl0" placeholder="書籍網址" style="flex:2;min-width:150px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);padding:8px;font-size:13px;outline:none;">
-                    <button type="button" class="btn-outline" style="padding:6px 12px;font-size:12px;" onclick="addPlatformRow()">+</button>
-                </div>
-            </div>
+    function openModal(i) {
+      const b = BOOKS[i];
+      const st = statusOf(b);
+      const rows = [];
+      rows.push(`<div class="field"><span class="label">作者</span>${esc(b.author) || "未知"}</div>`);
+      rows.push(`<div class="field"><span class="label">購買平台</span>${esc(b.platform_name)}</div>`);
+      if (b.publisher) rows.push(`<div class="field"><span class="label">出版社</span>${esc(b.publisher)}</div>`);
+      if (b.isbn)      rows.push(`<div class="field"><span class="label">ISBN</span>${esc(b.isbn)}</div>`);
+      if (b.price)     rows.push(`<div class="field"><span class="label">價格</span>${esc(b.currency || "")} ${esc(b.price)}</div>`);
+      if (b.added_at)  rows.push(`<div class="field"><span class="label">加入時間</span>${esc(b.added_at.replace("T", " "))}</div>`);
 
-            <button type="submit" class="btn" style="width:100%;padding:12px;font-size:15px;margin-top:8px;" onclick="submitNewBook()">儲存</button>
-        </form>
-    </div>
-</div>
+      const statusBtns = STATUS_ORDER.map(key =>
+        `<button class="${key} ${st === key ? "active" : ""}" onclick="setStatus('${b.id}','${key}')">${STATUS[key].label}</button>`
+      ).join("");
 
-<script src="/api/js/app.js"></script>
+      document.getElementById("modal").innerHTML = `
+        <div class="modal-top">
+          ${b.cover
+            ? `<img src="${esc(b.cover)}" alt="封面" onerror="this.outerHTML='<div class=&quot;no-cover-lg&quot;>無封面</div>'">`
+            : `<div class="no-cover-lg">無封面</div>`}
+          <div>
+            <h2>${esc(b.title)}</h2>
+            ${rows.join("")}
+          </div>
+        </div>
+        <div class="status-switch">
+          <span class="label">閱讀狀態</span>
+          ${statusBtns}
+        </div>
+        ${b.description ? `<div class="desc">${esc(b.description)}</div>` : ""}
+        <div class="modal-actions">
+          <button class="btn-del" onclick="delBook('${b.id}')">刪除</button>
+          <a class="btn-open" href="${esc(b.url)}" target="_blank" rel="noopener">前往購買頁</a>
+          <button class="btn-close" onclick="closeModal()">關閉</button>
+        </div>`;
+      document.getElementById("overlay").classList.add("show");
+    }
+
+    function closeModal() {
+      document.getElementById("overlay").classList.remove("show");
+    }
+
+    function showMsg(text, type) {
+      const m = document.getElementById("msg");
+      m.textContent = text;
+      m.className = type;
+    }
+
+    // 更新閱讀狀態
+    async function setStatus(id, status) {
+      const res = await fetch("/api/books/" + id, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        const idx = BOOKS.findIndex(x => x.id === id);
+        if (idx >= 0) BOOKS[idx] = updated;
+        render();
+        openModal(BOOKS.findIndex(x => x.id === id));  // 重新開啟以更新高亮
+      } else {
+        showMsg("更新狀態失敗。", "err");
+      }
+    }
+
+    async function addBook() {
+      const input = document.getElementById("urlInput");
+      const btn = document.getElementById("addBtn");
+      const url = input.value.trim();
+      if (!url) { showMsg("請先貼上書本網址。", "err"); return; }
+
+      btn.disabled = true;
+      btn.textContent = "抓取中…";
+      showMsg("正在抓取書本資訊,請稍候…", "ok");
+
+      try {
+        const res = await fetch("/api/books", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showMsg(data.error || "新增失敗。", "err");
+        } else {
+          input.value = "";
+          showMsg(`已加入:《${data.title}》`, "ok");
+          await loadBooks();
+        }
+      } catch (e) {
+        showMsg("連線發生問題:" + e.message, "err");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "新增書本";
+      }
+    }
+
+    async function delBook(id) {
+      if (!confirm("確定要從書庫移除這本書嗎?")) return;
+      const res = await fetch("/api/books/" + id, { method: "DELETE" });
+      if (res.ok) {
+        closeModal();
+        showMsg("已移除書本。", "ok");
+        await loadBooks();
+      } else {
+        showMsg("刪除失敗。", "err");
+      }
+    }
+
+    document.getElementById("urlInput").addEventListener("keydown", e => {
+      if (e.key === "Enter") addBook();
+    });
+    document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+    loadBooks();
+  </script>
 </body>
 </html>
